@@ -1,5 +1,6 @@
 #include <vector>
 #include "../GoogleBenchmark/benchmark/include/benchmark/benchmark.h"
+#include <iostream>
 #pragma comment(lib, "Shlwapi.lib")
 
 const int VAPOR = 0;
@@ -11,15 +12,19 @@ struct Equ_t
 	double X[TOTAL + 1][NOC];
 	double VF;
 };
+Equ_t equObj;
+
+double expectedSumZXY;
 
 static void Array(benchmark::State& state) {
-	double sumX, sumY, sumZXY;
-	Equ_t equObj;
+	double sumX, sumY, sumZXY;	
 	equObj.VF = 1;
 	Equ_t* equ = &equObj;
 
 	// Code before the loop is not measured
 	for (auto _ : state) {
+		sumX = sumY = sumZXY = 0;
+
 		for (long i = 0; i < NOC; ++i)
 		{
 			sumY += equ->X[VAPOR][i];
@@ -27,12 +32,14 @@ static void Array(benchmark::State& state) {
 			sumZXY += -equ->X[TOTAL][i]
 				+ (equ->VF * equ->X[VAPOR][i]
 					+ (1.0 - equ->VF)*equ->X[LIQUID][i]);
-		}
+		}		
 		benchmark::DoNotOptimize(sumY);
 		benchmark::DoNotOptimize(sumX);
 		benchmark::DoNotOptimize(sumZXY);
 		benchmark::ClobberMemory();
 	}
+
+	expectedSumZXY = sumZXY;
 }
 BENCHMARK(Array);
 
@@ -40,13 +47,14 @@ BENCHMARK(Array);
  * One possible optimization is to avoid using [] but use pointer operations
  */
 static void Array_AsPointer(benchmark::State& state) {
-	double sumX, sumY, sumZXY;
-	Equ_t equObj;
+	double sumX, sumY, sumZXY;	
 	equObj.VF = 1;
 	Equ_t* equ = &equObj;
 
 	// Code before the loop is not measured
 	for (auto _ : state) {
+		sumX = sumY = sumZXY = 0;
+		
 		auto xVapor = equ->X[VAPOR];
 		auto xLiquid = equ->X[LIQUID];
 		auto xTotal = equ->X[TOTAL];
@@ -61,10 +69,17 @@ static void Array_AsPointer(benchmark::State& state) {
 
 			xVapor++; xLiquid++; xTotal++;
 		}
+		
 		benchmark::DoNotOptimize(sumY);
 		benchmark::DoNotOptimize(sumX);
 		benchmark::DoNotOptimize(sumZXY);
 		benchmark::ClobberMemory();
+	}
+
+
+	if (sumZXY != expectedSumZXY)
+	{
+		std::cerr << "sum should match";
 	}
 }
 BENCHMARK(Array_AsPointer);
@@ -83,6 +98,17 @@ struct Equ_v
 {
 	compoment Components[NOC];
 	double VF;
+
+	Equ_v(const Equ_t & source)
+	{
+		for(int i = 0; i < NOC; i++)
+		{
+			this->Components[i].LIQUID = source.X[LIQUID][i];
+			this->Components[i].VAPOR = source.X[VAPOR][i];
+			this->Components[i].TOTAL = source.X[TOTAL][i];
+		}
+		this->VF = source.VF;
+	}
 };
 
 /**
@@ -91,25 +117,30 @@ struct Equ_v
 static void Array_ManualVectorization(benchmark::State& state) {
 	compoment sum;
 	sum.VLT = _mm256_setzero_pd();
-	Equ_v equObj;
-	equObj.VF = 1;
+	Equ_v equObj(equObj);
 	Equ_v* equ = &equObj;
 	double sumZXY;
 
 	// Code before the loop is not measured
 	for (auto _ : state) {
-
+		sum.LIQUID = sum.TOTAL = sum.VAPOR = 0;
 		auto* data = equObj.Components;
 
-		for (long i = 0; ++data, i < NOC; ++i)
+		for (long i = 0; i < NOC; ++data, ++i)
 		{
 			sum.VLT = _mm256_add_pd(data->VLT, sum.VLT);
 		}
 
 		sumZXY = -sum.TOTAL + equObj.VF * sum.VAPOR + (1 - equObj.VF) * sum.LIQUID;
+
 		benchmark::DoNotOptimize(sum);
 		benchmark::DoNotOptimize(sumZXY);
 		benchmark::ClobberMemory();
+	}
+
+	if (sumZXY != expectedSumZXY)
+	{
+		std::cerr << "sum should match";
 	}
 }
 BENCHMARK(Array_ManualVectorization);
@@ -126,13 +157,14 @@ BENCHMARK(Array_ManualVectorization);
  */
 static void Array_MathRewrite(benchmark::State& state) {
 	
-	double sumX, sumY, sumT, sumZXY;
-	Equ_t equObj;
+	double sumX, sumY, sumT, sumZXY;	
 	equObj.VF = 1;
 	Equ_t* equ = &equObj;
 
 	// Code before the loop is not measured
 	for (auto _ : state) {
+		sumX = sumY = sumT = sumZXY = 0;
+		
 		for (long i = 0; i < NOC; ++i)
 		{
 			sumY += equ->X[VAPOR][i];
@@ -142,13 +174,19 @@ static void Array_MathRewrite(benchmark::State& state) {
 
 		sumZXY = -sumT
 			+ equ->VF * sumY
-			+ (1.0 - equ->VF) * sumX;
+			+ (1.0 - equ->VF) * sumX;		
 
 		benchmark::DoNotOptimize(sumY);
 		benchmark::DoNotOptimize(sumX);
 		benchmark::DoNotOptimize(sumT);
 		benchmark::DoNotOptimize(sumZXY);
 		benchmark::ClobberMemory();
+	}
+
+
+	if (sumZXY != expectedSumZXY)
+	{
+		std::cerr << "sum should match";
 	}
 }
 BENCHMARK(Array_MathRewrite);
@@ -161,14 +199,15 @@ BENCHMARK(Array_MathRewrite);
 static void Array_DuffDevice(benchmark::State& state) {
 		
 	double sumX, sumY, sumT, sumZXY;
-	double sumX2, sumY2, sumT2;
-	Equ_t equObj;
+	double sumX2, sumY2, sumT2;	
 	equObj.VF = 1;
 	Equ_t* equ = &equObj;
 
 	// Code before the loop is not measured
 	for (auto _ : state) {
-					
+
+		sumX2 = sumY2 = sumT2 = sumX = sumY = sumT = sumZXY = 0;
+		
 		for (long i = 0; i < NOC; i += 2)
 		{
 			sumY += equ->X[VAPOR][i];
@@ -202,6 +241,12 @@ static void Array_DuffDevice(benchmark::State& state) {
 		benchmark::DoNotOptimize(sumT);
 		benchmark::DoNotOptimize(sumZXY);
 		benchmark::ClobberMemory();
+	}
+
+
+	if (sumZXY != expectedSumZXY)
+	{
+		std::cerr << "sum should match";
 	}
 }
 BENCHMARK(Array_DuffDevice);
