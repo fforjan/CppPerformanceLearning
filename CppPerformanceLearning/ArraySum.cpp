@@ -154,6 +154,10 @@ static void Array_MathRewrite(benchmark::State& state) {
 BENCHMARK(Array_MathRewrite);
 
 
+/**
+ * This takes the advantage that we can do multiple additions in parallel and optimization the algorithm to do it manually.
+ * This can be seen as a different implementation of the https://en.wikipedia.org/wiki/Duff%27s_device
+ */
 static void Array_DuffDevice(benchmark::State& state) {
 		
 	double sumX, sumY, sumT, sumZXY;
