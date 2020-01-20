@@ -21,5 +21,8 @@
     <ClCompile Include="ArraySum.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SimpleForLoop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
