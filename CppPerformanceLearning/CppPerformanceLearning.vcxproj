@@ -154,6 +154,7 @@
   <ItemGroup>
     <ClCompile Include="BenchMarkMain.cpp" />
     <ClCompile Include="ArraySum.cpp" />
+    <ClCompile Include="Initialization.cpp" />
     <ClCompile Include="SimpleForLoop.cpp" />
   </ItemGroup>
   <ItemGroup>

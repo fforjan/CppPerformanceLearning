@@ -12,7 +12,7 @@ struct Equ_t
 	double VF;
 };
 
-static void ArrayO(benchmark::State& state) {
+static void Array(benchmark::State& state) {
 	double sumX, sumY, sumZXY;
 	Equ_t equObj;
 	equObj.VF = 1;
@@ -34,4 +34,4 @@ static void ArrayO(benchmark::State& state) {
 		benchmark::ClobberMemory();
 	}
 }
-BENCHMARK(ArrayO);
+BENCHMARK(Array);

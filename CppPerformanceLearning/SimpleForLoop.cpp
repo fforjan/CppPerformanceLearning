@@ -33,7 +33,7 @@ double* State::getData()
 	return this->data;
 }
 
-static void Loop(benchmark::State& state) {
+static void SimpleLoop(benchmark::State& state) {
 
 	State * componentState = new State(100);
 	// Code before the loop is not measured
@@ -48,4 +48,4 @@ static void Loop(benchmark::State& state) {
 		benchmark::ClobberMemory();
 	}
 }
-BENCHMARK(Loop);
+BENCHMARK(SimpleLoop);
