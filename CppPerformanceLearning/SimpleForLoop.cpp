@@ -90,6 +90,44 @@ BENCHMARK(SimpleLoop_NoVirtual);
 
 
 /**
+ * Other optimization is to enable the compiler to do the optimization because the object is constant
+ */
+class StateConst
+{
+private:
+	int noc;
+	double* data;
+
+public:
+	StateConst(int NOC) {
+		this->noc = NOC;
+		this->data = new double[NOC];
+		std::fill_n(this->data, NOC, 0.5);
+
+	}
+	virtual long getNOC() const { return noc; }
+
+	virtual double* getData() const { return data; }
+};
+
+static void SimpleLoop_Const(benchmark::State& state) {	
+	const StateConst componentState(100);
+	// Code before the loop is not measured
+	for (auto _ : state) {
+		for (int i = 0; i < componentState.getNOC(); i++)
+		{
+			if (componentState.getData()[i] > 0.9)
+				break;
+		}
+
+		benchmark::DoNotOptimize(componentState);
+		benchmark::ClobberMemory();
+	}
+}
+BENCHMARK(SimpleLoop_Const);
+
+
+/**
  *  one of the issue with the previous is to call the getNOC method and getData into each iterations
  *  those call are costly and can be easily avoided
  */
